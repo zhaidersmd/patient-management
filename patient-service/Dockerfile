@@ -10,6 +10,7 @@
 #  -e SPRING_SQL_INIT_MODE=always \
 #  -e BILLING_SERVICE_ADDRESS=billing-service
 #  -e BILLING_SERVICE_GRPC_PORT=9001
+#  -e SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 #  patient-service:latest
 ##
 
