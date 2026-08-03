@@ -1,13 +1,13 @@
-package com.pm.analyticsservice;
+package com.pm.authservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class AnalyticsServiceApplication {
+public class AuthServiceApplication {
 
     public static void main(String[] args) {
-
-        SpringApplication.run(AnalyticsServiceApplication.class, args);
+        SpringApplication.run(AuthServiceApplication.class, args);
     }
+
 }
