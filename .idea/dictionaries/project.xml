@@ -2,6 +2,8 @@
   <dictionary name="project">
     <words>
       <w>jdbc</w>
+      <w>mskcluster</w>
+      <w>patientmanagementvpc</w>
     </words>
   </dictionary>
 </component>
