@@ -5,12 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f7163930-67ee-4d13-979f-45c31698edb5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/integration-tests/src/test/java/AuthIntegrationTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/integration-tests/src/test/java/PatientIntegrationTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/integration-tests/src/test/java/PatientIntegrationTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/integration-tests/src/test/java/PatientIntegrationTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/integration-tests/src/test/java/com/pm/integrationtests/IntegrationTestsApplicationTests.java" beforeDir="false" afterPath="$PROJECT_DIR$/integration-tests/src/test/java/com/pm/integrationtests/IntegrationTestsApplicationTests.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,6 +50,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "JUnit.All in integration-tests.executor": "Run",
     "JUnit.AuthIntegrationTest.executor": "Run",
     "JUnit.AuthIntegrationTest.shouldReturnOKWithValidToken.executor": "Debug",
     "JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken.executor": "Run",
@@ -93,7 +91,15 @@
       <recent name="com.pm.integrationtests" />
     </key>
   </component>
-  <component name="RunManager" selected="JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken">
+  <component name="RunManager" selected="JUnit.All in integration-tests">
+    <configuration name="All in integration-tests" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="integration-tests" />
+      <option name="PACKAGE_NAME" value="" />
+      <option name="TEST_OBJECT" value="package" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="AuthIntegrationTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="integration-tests" />
       <option name="PACKAGE_NAME" value="" />
@@ -125,6 +131,7 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="JUnit.All in integration-tests" />
         <item itemvalue="JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken" />
         <item itemvalue="JUnit.AuthIntegrationTest" />
         <item itemvalue="JUnit.AuthIntegrationTest.shouldReturnOKWithValidToken" />

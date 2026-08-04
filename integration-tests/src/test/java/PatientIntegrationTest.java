@@ -31,15 +31,7 @@ public class PatientIntegrationTest {
                 .jsonPath()
                 .getString("token");
 
-        Response loginResponse = given() .contentType("application/json")
-                .body(payload)
-                .when()
-                .post("/auth/login");
 
-        loginResponse.prettyPrint();
-
-        String token2 = loginResponse.jsonPath().getString("token");
-        System.out.println("TOKEN = " + token2);
 
 
         given()

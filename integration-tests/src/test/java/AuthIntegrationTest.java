@@ -30,7 +30,7 @@ public class AuthIntegrationTest {
                 .extract()
                 .response();
 
-        System.out.println("Generated Token: " + response.jsonPath().getString("token"));
+
     }
 
 

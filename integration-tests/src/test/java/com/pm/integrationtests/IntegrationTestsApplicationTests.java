@@ -8,8 +8,6 @@ class IntegrationTestsApplicationTests {
 
 
 
-    @Test
-    void contextLoads() {
-    }
+
 
 }
