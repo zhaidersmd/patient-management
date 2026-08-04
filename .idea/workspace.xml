@@ -5,17 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f7163930-67ee-4d13-979f-45c31698edb5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/api-gateway/src/main/java/com/pm/apigateway/exception/JwtValidationException.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/api-gateway/src/main/java/com/pm/apigateway/filter/JwtValidationGatewayFilterFactory.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/auth-service/src/main/java/com/pm/authservice/config/SecurityConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/auth-service/src/main/java/com/pm/authservice/repository/UserRepository.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/auth-service/src/main/java/com/pm/authservice/service/UserService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/auth-service/src/main/java/com/pm/authservice/util/JwtUtil.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/integration-tests/src/test/java/AuthIntegrationTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/integration-tests/src/test/java/PatientIntegrationTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analytics-service/src/main/java/com/pm/analyticsservice/AnalyticsServiceApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/analytics-service/src/main/java/com/pm/analyticsservice/AnalyticsServiceApplication.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,6 +53,9 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "JUnit.AuthIntegrationTest.executor": "Run",
+    "JUnit.AuthIntegrationTest.shouldReturnOKWithValidToken.executor": "Debug",
+    "JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken.executor": "Run",
     "Maven.analytics-service [clean].executor": "Run",
     "Maven.analytics-service [compile].executor": "Run",
     "Maven.billing-service [compile].executor": "Run",
@@ -90,6 +88,48 @@
       <recent name="$PROJECT_DIR$/billing-service/src/main" />
       <recent name="$PROJECT_DIR$/billing-service/src" />
     </key>
+    <key name="MoveClassesOrPackagesDialog.RECENTS_KEY">
+      <recent name="" />
+      <recent name="com.pm.integrationtests" />
+    </key>
+  </component>
+  <component name="RunManager" selected="JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken">
+    <configuration name="AuthIntegrationTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="integration-tests" />
+      <option name="PACKAGE_NAME" value="" />
+      <option name="MAIN_CLASS_NAME" value="AuthIntegrationTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="AuthIntegrationTest.shouldReturnOKWithValidToken" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="integration-tests" />
+      <option name="PACKAGE_NAME" value="" />
+      <option name="MAIN_CLASS_NAME" value="AuthIntegrationTest" />
+      <option name="METHOD_NAME" value="shouldReturnOKWithValidToken" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="PatientIntegrationTest.shouldReturnPatientsWithValidToken" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="integration-tests" />
+      <option name="PACKAGE_NAME" value="" />
+      <option name="MAIN_CLASS_NAME" value="PatientIntegrationTest" />
+      <option name="METHOD_NAME" value="shouldReturnPatientsWithValidToken" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken" />
+        <item itemvalue="JUnit.AuthIntegrationTest" />
+        <item itemvalue="JUnit.AuthIntegrationTest.shouldReturnOKWithValidToken" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
