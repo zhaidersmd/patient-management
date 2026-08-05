@@ -5,15 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="f7163930-67ee-4d13-979f-45c31698edb5" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/api-gateway/src/main/resources/application-prod.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/infrastructure/localstack-deploy.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/infrastructure/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/infrastructure/src/main/java/com/pm/stack/LocalStack.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/project.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/project.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/encodings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/encodings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/api-gateway/src/main/resources/application-prod.yml" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -99,21 +92,7 @@
       <recent name="com.pm.integrationtests" />
     </key>
   </component>
-  <component name="RunManager" selected="Application.LocalStack">
-    <configuration name="LocalStack" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
-      <option name="MAIN_CLASS_NAME" value="com.pm.stack.LocalStack" />
-      <module name="infrastructure" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/infrastructure" />
-      <extension name="coverage">
-        <pattern>
-          <option name="PATTERN" value="com.pm.stack.*" />
-          <option name="ENABLED" value="true" />
-        </pattern>
-      </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
+  <component name="RunManager" selected="JUnit.All in integration-tests">
     <configuration name="All in integration-tests" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
       <module name="integration-tests" />
       <option name="PACKAGE_NAME" value="" />
@@ -152,7 +131,6 @@
       </method>
     </configuration>
     <list>
-      <item itemvalue="Application.LocalStack" />
       <item itemvalue="JUnit.All in integration-tests" />
       <item itemvalue="JUnit.AuthIntegrationTest" />
       <item itemvalue="JUnit.AuthIntegrationTest.shouldReturnOKWithValidToken" />
@@ -160,7 +138,6 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Application.LocalStack" />
         <item itemvalue="JUnit.All in integration-tests" />
         <item itemvalue="JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken" />
         <item itemvalue="JUnit.AuthIntegrationTest" />
