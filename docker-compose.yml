@@ -1,7 +1,6 @@
 version: "3.8"
 
 services:
-
   postgres:
     image: postgres:16
     container_name: patient-service-db
@@ -23,7 +22,7 @@ services:
 
   patient-service:
     build:
-      context: .
+      context: ./patient-service
       dockerfile: Dockerfile
 
     image: patient-service:latest
@@ -46,6 +45,3 @@ services:
 
     networks:
       - internal
-
-networks:
-  internal:
