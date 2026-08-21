@@ -3,8 +3,10 @@ pipeline {
 
     environment {
         AWS_REGION = 'ap-south-1'
+        ECR_REGISTRY = '774118824657.dkr.ecr.ap-south-1.amazonaws.com'
         ECR_REPOSITORY = '774118824657.dkr.ecr.ap-south-1.amazonaws.com/patient-service'
         AWS_CREDENTIALS = 'aws-patient-service'
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -17,18 +19,22 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                sh '''
-                    mvn clean test
-                '''
+                dir('patient-service') {
+                    sh '''
+                        mvn clean test
+                    '''
+                }
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh '''
-                    docker build \
-                        -t ${ECR_REPOSITORY}:${BUILD_NUMBER} .
-                '''
+                dir('patient-service') {
+                    sh '''
+                        docker build \
+                            -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
+                    '''
+                }
             }
         }
 
@@ -43,7 +49,7 @@ pipeline {
                             --region ${AWS_REGION} | \
                         docker login \
                             --username AWS \
-                            --password-stdin ${ECR_REPOSITORY}
+                            --password-stdin ${ECR_REGISTRY}
                     '''
                 }
             }
@@ -51,14 +57,9 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: "${AWS_CREDENTIALS}"]
-                    ]) {
-                    sh '''
-                        docker push ${ECR_REPOSITORY}:${BUILD_NUMBER}
-                    '''
-                }
+                sh '''
+                    docker push ${ECR_REPOSITORY}:${IMAGE_TAG}
+                '''
             }
         }
     }
@@ -66,10 +67,16 @@ pipeline {
     post {
         success {
             echo "CI pipeline completed successfully."
+            echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
         }
 
         failure {
             echo "CI pipeline failed."
+        }
+
+        always {
+            sh 'docker logout ${ECR_REGISTRY} || true'
+
         }
     }
 }
