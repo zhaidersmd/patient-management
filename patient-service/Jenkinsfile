@@ -19,16 +19,16 @@ pipeline {
 
         stage('Build & Test') {
             steps
-            {   withEnv([
+            {  withEnv([
                         'SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres',
                         'SPRING_DATASOURCE_USERNAME=postgres',
                         'SPRING_DATASOURCE_PASSWORD=postgres'
-                    ])
+                    ]) {
                 dir('patient-service') {
                     sh '''
                         mvn -B clean test
                     '''
-                }
+                }}
             }
         }
 
