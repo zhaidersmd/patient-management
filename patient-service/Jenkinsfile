@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'ap-south-1'
+        ECR_REPOSITORY = '774118824657.dkr.ecr.ap-south-1.amazonaws.com/patient-service'
+        AWS_CREDENTIALS = 'aws-patient-service'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                sh '''
+                    mvn clean test
+                '''
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    docker build \
+                        -t ${ECR_REPOSITORY}:${BUILD_NUMBER} .
+                '''
+            }
+        }
+
+        stage('ECR Login') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        aws ecr get-login-password \
+                            --region ${AWS_REGION} | \
+                        docker login \
+                            --username AWS \
+                            --password-stdin ${ECR_REPOSITORY}
+                    '''
+                }
+            }
+        }
+
+        stage('Push to ECR') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        docker push ${ECR_REPOSITORY}:${BUILD_NUMBER}
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "CI pipeline completed successfully."
+        }
+
+        failure {
+            echo "CI pipeline failed."
+        }
+    }
+}
