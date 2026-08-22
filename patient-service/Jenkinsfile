@@ -9,6 +9,7 @@ pipeline {
         IMAGE_TAG = "${BUILD_NUMBER}"
         LAUNCH_TEMPLATE_ID = 'lt-0e1a3ca54608fee29'
         ASG_NAME = 'patient-service-asg'
+        HEALTH_URL = 'http://patient-service-alb-677738985.ap-south-1.elb.amazonaws.com/actuator/health'
     }
 
     stages {
@@ -20,35 +21,30 @@ pipeline {
         }
 
         stage('Build & Test') {
-            steps {
-                withEnv([
+            steps
+            {  withEnv([
                         'SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres',
                         'SPRING_DATASOURCE_USERNAME=postgres',
                         'SPRING_DATASOURCE_PASSWORD=postgres'
                     ]) {
                     dir('patient-service') {
-                        sh ''
-                        '
-                        mvn - B clean test ''
-                        '
-                    }
-                }
+                        sh '''
+                        mvn -B clean test
+                    '''
+                    }}
             }
         }
 
         stage('Docker Build') {
             steps {
                 dir('patient-service') {
-                    sh ''
-                    '
-                    docker build--platform linux / amd64\ -
-                    t $ {
-                        ECR_REPOSITORY
-                    }: $ {
-                        IMAGE_TAG
-                    }.
-                    ''
-                    '
+                    echo "Building Docker image..."
+                    sh '''
+                        docker build --platform linux/amd64 \
+                            -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
+                    '''
+                    echo "Docker image built:"
+                    docker images ${ECR_REPOSITORY}:${IMAGE_TAG}
                 }
             }
         }
@@ -57,114 +53,78 @@ pipeline {
             steps {
                 withCredentials([
                         [$class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: "${AWS_CREDENTIALS}"
-                        ]
+                            credentialsId: "${AWS_CREDENTIALS}"]
                     ]) {
-                    sh ''
-                    '
-                    aws ecr get - login - password\
-                    --region $ {
-                        AWS_REGION
-                    } | \
-                    docker login\
-                    --username AWS\
-                    --password - stdin $ {
-                        ECR_REGISTRY
-                    }
-                    ''
-                    '
+                    sh '''
+                        set -e
+                        aws ecr get-login-password \
+                            --region ${AWS_REGION} | \
+                        docker login \
+                            --username AWS \
+                            --password-stdin ${ECR_REGISTRY}
+                    '''
                 }
             }
         }
 
         stage('Push to ECR') {
             steps {
-                sh ''
-                '
-                docker push $ {
-                    ECR_REPOSITORY
-                }: $ {
-                    IMAGE_TAG
-                }
-                ''
-                '
+                sh '''
+                    docker push ${ECR_REPOSITORY}:${IMAGE_TAG}
+                '''
             }
         }
 
-        stage('Deploy') {
+        stage('Create Launch Template Version') {
             steps {
                 withCredentials([
                         [$class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: "${AWS_CREDENTIALS}"
-                        ]
+                            credentialsId: "${AWS_CREDENTIALS}"]
                     ]) {
-                    script {
-                        sh ''
-                        '
-                        echo "Creating new Launch Template version..."
+                    sh '''
+                        set -e
 
-                        # Your existing commands that create the new
-                        # Launch Template version should remain here.
+                        echo "========================================="
+                        echo "Creating Launch Template version"
+                        echo "Image tag: ${IMAGE_TAG}"
+                        echo "========================================="
 
-                        echo "Updating ASG..."
+                        CURRENT_VERSION=$(aws ec2 describe-launch-template-versions \
+                            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
+                            --region ${AWS_REGION} \
+                            --query 'max_by(Versions, &VersionNumber).VersionNumber' \
+                            --output text)
 
-                        # Your existing ASG update command should remain here.
-                        ''
-                        '
+                        echo "Current Launch Template version: ${CURRENT_VERSION}"
 
-                        def refreshId = sh(
-                            script: ''
-                            '
-                            aws autoscaling start - instance - refresh\
-                            --auto - scaling - group - name patient - service - asg\
-                            --preferences MinHealthyPercentage = 100, InstanceWarmup = 120\
-                            --region $ {
-                                AWS_REGION
-                            }\
-                            --query 'InstanceRefreshId'\
-                            --output text ''
-                            ',
-                            returnStdout: true
-                        ).trim()
+                        # Generate User Data with the current image tag.
+                        sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
+                            patient-service/aws/user-data.sh \
+                            > generated-user-data.sh
 
-                        echo "Instance Refresh started: ${refreshId}"
+                        echo "Generated User Data successfully."
 
-                        timeout(time: 15, unit: 'MINUTES') {
-                            waitUntil {
-                                def status = sh(
-                                    script: ""
-                                    "
-                                    aws autoscaling describe - instance - refreshes\
-                                    --auto - scaling - group - name patient - service - asg\
-                                    --instance - refresh - ids $ {
-                                        refreshId
-                                    }\
-                                    --region $ {
-                                        AWS_REGION
-                                    }\
-                                    --query 'InstanceRefreshes[0].Status'\
-                                    --output text ""
-                                    ",
-                                    returnStdout: true
-                                ).trim()
+                        # Base64 encode User Data for AWS API.
+                        USER_DATA=$(base64 -w 0 generated-user-data.sh)
 
-                                echo "Instance Refresh status: ${status}"
+                        aws ec2 create-launch-template-version \
+                            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
+                            --source-version ${CURRENT_VERSION} \
+                            --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
+                            --launch-template-data "{
+                                \\"UserData\\": \\"${USER_DATA}\\"
+                            }" \
+                            --region ${AWS_REGION} \
+                            --query 'LaunchTemplateVersion.VersionNumber' \
+                            --output text \
+                            > new_lt_version.txt
 
-                                if (status == 'Successful') {
-                                    return true
-                                }
+                        NEW_VERSION=$(cat new_lt_version.txt)
 
-                                if (status in ['Failed', 'Cancelled']) {
-                                    error("Instance Refresh failed with status: ${status}")
-                                }
+                        echo "New Launch Template version: ${NEW_VERSION}"
 
-                                sleep 20
-                                return false
-                            }
-                        }
-
-                        echo "Instance Refresh completed successfully."
-                    }
+                        echo "${NEW_VERSION}" > new_lt_version.txt
+                    '''
                 }
             }
         }
@@ -173,34 +133,23 @@ pipeline {
             steps {
                 withCredentials([
                         [$class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: "${AWS_CREDENTIALS}"
-                        ]
+                            credentialsId: "${AWS_CREDENTIALS}"]
                     ]) {
-                    sh ''
-                    '
-                    set - e
+                    sh '''
+                        set -e
 
-                    NEW_VERSION = $(cat new_lt_version.txt)
+                        NEW_VERSION=$(cat new_lt_version.txt)
 
-                    echo "Updating ASG to Launch Template version ${NEW_VERSION}..."
+                        echo "Updating ASG to Launch Template version ${NEW_VERSION}..."
 
-                    aws autoscaling update - auto - scaling - group\
-                    --auto - scaling - group - name $ {
-                        ASG_NAME
-                    }\
-                    --launch - template\
-                    LaunchTemplateId = $ {
-                        LAUNCH_TEMPLATE_ID
-                    }, Version = $ {
-                        NEW_VERSION
-                    }\
-                    --region $ {
-                        AWS_REGION
-                    }
+                        aws autoscaling update-auto-scaling-group \
+                            --auto-scaling-group-name ${ASG_NAME} \
+                            --launch-template \
+                                LaunchTemplateId=${LAUNCH_TEMPLATE_ID},Version=${NEW_VERSION} \
+                            --region ${AWS_REGION}
 
-                    echo "ASG updated successfully."
-                    ''
-                    '
+                        echo "ASG updated successfully."
+                    '''
                 }
             }
         }
@@ -209,30 +158,24 @@ pipeline {
             steps {
                 withCredentials([
                         [$class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: "${AWS_CREDENTIALS}"
-                        ]
+                            credentialsId: "${AWS_CREDENTIALS}"]
                     ]) {
-                    sh ''
-                    '
-                    set - e
+                    sh '''
+                        set -e
 
-                    echo "Starting Instance Refresh..."
+                        echo "Starting Instance Refresh..."
 
-                    REFRESH_ID = $(aws autoscaling start - instance - refresh\
-                        --auto - scaling - group - name $ {
-                            ASG_NAME
-                        }\
-                        --preferences MinHealthyPercentage = 100, InstanceWarmup = 120\
-                        --region $ {
-                            AWS_REGION
-                        }\
-                        --query 'InstanceRefreshId'\
-                        --output text)
+                        REFRESH_ID=$(aws autoscaling start-instance-refresh \
+                          --auto-scaling-group-name ${ASG_NAME} \
+                          --preferences MinHealthyPercentage=100,InstanceWarmup=120 \
+                          --region ${AWS_REGION} \
+                          --query 'InstanceRefreshId' \
+                          --output text)
 
-                    echo "Instance Refresh started: ${REFRESH_ID}"
+                        echo "Instance Refresh started: ${REFRESH_ID}"
 
-                    echo "${REFRESH_ID}" > refresh_id.txt ''
-                    '
+                        echo "${REFRESH_ID}" > refresh_id.txt
+                    '''
                 }
             }
 
@@ -241,119 +184,108 @@ pipeline {
             steps {
                 withCredentials([
                         [$class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: "${AWS_CREDENTIALS}"
-                        ]
+                            credentialsId: "${AWS_CREDENTIALS}"]
                     ]) {
-                    sh ''
-                    '
-                    set - e
+                    sh '''
+                        set -e
 
-                    REFRESH_ID = $(cat refresh_id.txt)
+                        REFRESH_ID=$(cat refresh_id.txt)
 
-                    echo "Waiting for Instance Refresh ${REFRESH_ID}..."
+                        echo "Waiting for Instance Refresh ${REFRESH_ID}..."
 
-                    for i in $(seq 1 60);
-                    do
+                        for i in $(seq 1 60); do
 
-                    STATUS = $(aws autoscaling describe - instance - refreshes\
-                        --auto - scaling - group - name $ {
-                            ASG_NAME
-                        }\
-                        --instance - refresh - ids $ {
-                            REFRESH_ID
-                        }\
-                        --region $ {
-                            AWS_REGION
-                        }\
-                        --query 'InstanceRefreshes[0].Status'\
-                        --output text)
+                            STATUS=$(aws autoscaling describe-instance-refreshes \
+                                --auto-scaling-group-name ${ASG_NAME} \
+                                --instance-refresh-ids ${REFRESH_ID} \
+                                --region ${AWS_REGION} \
+                                --query 'InstanceRefreshes[0].Status' \
+                                --output text)
 
-                    echo "Instance Refresh status: ${STATUS}"
+                            echo "Instance Refresh status: ${STATUS}"
 
-                    case "$STATUS" in
+                            case "$STATUS" in
 
-                    Successful)
-                echo "Deployment completed successfully."
-                exit 0
-                ;;
+                                Successful)
+                                    echo "Deployment completed successfully."
+                                    exit 0
+                                    ;;
 
-                Failed | Cancelled | RollbackFailed)
-            echo "Deployment failed with status: ${STATUS}"
-            exit 1
-            ;;
+                                Failed|Cancelled|RollbackFailed)
+                                    echo "Deployment failed with status: ${STATUS}"
+                                    exit 1
+                                    ;;
 
-            *)
-        sleep 20
-        ;;
-        esac
+                                *)
+                                    sleep 20
+                                    ;;
+                            esac
 
-        done
+                        done
 
-        echo "Deployment timed out."
-        exit 1
-        ''
-        '
-    }
-}
-}
-}
-
-stage('Verify Deployment') {
-    steps {
-        script {
-            def healthUrl = 'http://patient-service-alb-677738985.ap-south-1.elb.amazonaws.com/actuator/health'
-
-            timeout(time: 3, unit: 'MINUTES') {
-                waitUntil {
-                    def status = sh(
-                        script: ""
-                        "
-                        curl - s - o / tmp / health.json\ -
-                        w "%{http_code}"\
-                        $ {
-                            healthUrl
-                        }
-                        ""
-                        ",
-                        returnStdout: true
-                    ).trim()
-
-                    def response = sh(
-                        script: "cat /tmp/health.json",
-                        returnStdout: true
-                    ).trim()
-
-                    echo "HTTP Status: ${status}"
-                    echo "Health Response: ${response}"
-
-                    if (status == '200' && response.contains('"status":"UP"')) {
-                        return true
-                    }
-
-                    echo "Application is not healthy yet. Waiting..."
-                    sleep 10
-                    return false
+                        echo "Deployment timed out."
+                        exit 1
+                    '''
                 }
             }
-
-            echo "Application health check passed."
         }
     }
-}
 
-post {
-    success {
-        echo "CI pipeline completed successfully."
-        echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+
+    stage('Verify Deployment') {
+        steps {
+            script {
+                def healthUrl = 'http://patient-service-alb-677738985.ap-south-1.elb.amazonaws.com/actuator/health'
+
+                timeout(time: 3, unit: 'MINUTES') {
+                    waitUntil {
+                        def status = sh(
+                            script: """
+                            curl -s -o /tmp/health.json \
+                                 -w "%{http_code}" \
+                                 ${healthUrl}
+                        """,
+                            returnStdout: true
+                        ).trim()
+
+                        def response = sh(
+                            script: "cat /tmp/health.json",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "HTTP Status: ${status}"
+                        echo "Health Response: ${response}"
+
+                        if (status == '200' && response.contains('"status":"UP"')) {
+                            return true
+                        }
+
+                        echo "Application is not healthy yet. Waiting..."
+                        sleep 10
+                        return false
+                    }
+                }
+
+                echo "Application health check passed."
+            }
+        }
     }
 
-    failure {
-        echo "CI pipeline failed."
-    }
 
-    always {
-        sh 'docker logout ${ECR_REGISTRY} || true'
+    post {
+        success {
+            echo "CI pipeline completed successfully."
+            echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
+        }
 
+        failure {
+            echo "CI pipeline failed."
+        }
+
+        always {
+            sh 'docker logout ${ECR_REGISTRY} || true'
+
+        }
     }
-}
 }

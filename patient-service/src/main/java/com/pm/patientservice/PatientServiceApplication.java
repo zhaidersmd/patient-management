@@ -16,7 +16,7 @@ public class PatientServiceApplication {
 
     @GetMapping("/")
     public String welcomePage() {
-        return "Welcome to Patient Service Module";
+        return "Hi There, Welcome to Patient Service Module!!";
     }
 
 
