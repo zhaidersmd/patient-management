@@ -44,7 +44,7 @@ pipeline {
                             -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
                     '''
                     echo "Docker image built:"
-                    // docker images ${ECR_REPOSITORY}:${IMAGE_TAG}
+                    docker images ${ECR_REPOSITORY}:${IMAGE_TAG}
                 }
             }
         }
@@ -233,59 +233,60 @@ pipeline {
 
 
 
-    stage('Verify Deployment') {
-        steps {
-            script {
-                def healthUrl = 'http://patient-service-alb-677738985.ap-south-1.elb.amazonaws.com/actuator/health'
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    def healthUrl = 'http://patient-service-alb-677738985.ap-south-1.elb.amazonaws.com/actuator/health'
 
-                timeout(time: 3, unit: 'MINUTES') {
-                    waitUntil {
-                        def status = sh(
-                            script: """
+                    timeout(time: 3, unit: 'MINUTES') {
+                        waitUntil {
+                            def status = sh(
+                                script: """
                             curl -s -o /tmp/health.json \
                                  -w "%{http_code}" \
                                  ${healthUrl}
                         """,
-                            returnStdout: true
-                        ).trim()
+                                returnStdout: true
+                            ).trim()
 
-                        def response = sh(
-                            script: "cat /tmp/health.json",
-                            returnStdout: true
-                        ).trim()
+                            def response = sh(
+                                script: "cat /tmp/health.json",
+                                returnStdout: true
+                            ).trim()
 
-                        echo "HTTP Status: ${status}"
-                        echo "Health Response: ${response}"
+                            echo "HTTP Status: ${status}"
+                            echo "Health Response: ${response}"
 
-                        if (status == '200' && response.contains('"status":"UP"')) {
-                            return true
+                            if (status == '200' && response.contains('"status":"UP"')) {
+                                return true
+                            }
+
+                            echo "Application is not healthy yet. Waiting..."
+                            sleep 10
+                            return false
                         }
-
-                        echo "Application is not healthy yet. Waiting..."
-                        sleep 10
-                        return false
                     }
-                }
 
-                echo "Application health check passed."
+                    echo "Application health check passed."
+                }
+            }
+        }
+
+
+        post {
+            success {
+                echo "CI pipeline completed successfully."
+                echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
+            }
+
+            failure {
+                echo "CI pipeline failed."
+            }
+
+            always {
+                sh 'docker logout ${ECR_REGISTRY} || true'
+
             }
         }
     }
-
-
-    post {
-        success {
-            echo "CI pipeline completed successfully."
-            echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
-        }
-
-        failure {
-            echo "CI pipeline failed."
-        }
-
-        always {
-            sh 'docker logout ${ECR_REGISTRY} || true'
-
-        }
-    }
-} }
+}
