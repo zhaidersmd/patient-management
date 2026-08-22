@@ -5,6 +5,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.annotation.PostConstruct;
+
 @SpringBootApplication
 @RestController
 public class PatientServiceApplication {
@@ -19,5 +21,10 @@ public class PatientServiceApplication {
         return "Hi There, Welcome to Patient Service Module!!curl -v localhost:4000/actuator/health";
     }
 
+
+    @PostConstruct
+    public void failStartup() {
+        throw new RuntimeException("INTENTIONAL DEPLOYMENT FAILURE - TEST");
+    }
 
 }

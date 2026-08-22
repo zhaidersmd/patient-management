@@ -7,7 +7,6 @@
     <list default="true" id="f7163930-67ee-4d13-979f-45c31698edb5" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/patient-service/Jenkinsfile" beforeDir="false" afterPath="$PROJECT_DIR$/patient-service/Jenkinsfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/patient-service/aws/user-data.sh" beforeDir="false" afterPath="$PROJECT_DIR$/patient-service/aws/user-data.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/patient-service/src/main/java/com/pm/patientservice/PatientServiceApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/patient-service/src/main/java/com/pm/patientservice/PatientServiceApplication.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
