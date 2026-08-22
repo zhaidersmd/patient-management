@@ -4,7 +4,7 @@ set -e
 
 REGION="ap-south-1"
 ECR_REPO="774118824657.dkr.ecr.ap-south-1.amazonaws.com/patient-service"
-IMAGE_TAG="__IMAGE_TAG__"
+IMAGE_TAG="43"
 
 SECRET_ARN="arn:aws:secretsmanager:ap-south-1:774118824657:secret:patient-service/rds-agbOdR"
 
@@ -16,7 +16,8 @@ RDS_DB="postgres"
 # ============================================================
 # 1. Install Docker
 # ============================================================
-
+echo "=== Starting patient-service bootstrap ==="
+echo "=== Starting Docker ==="
 dnf install -y docker
 
 systemctl enable --now docker
@@ -26,7 +27,9 @@ systemctl enable --now docker
 # 2. Install CloudWatch Agent
 # ============================================================
 
-dnf install -y amazon-cloudwatch-agent
+if ! rpm -q amazon-cloudwatch-agent >/dev/null 2>&1; then
+  dnf install -y amazon-cloudwatch-agent
+fi
 
 
 # ============================================================
