@@ -139,11 +139,23 @@ pipeline {
 
                         echo "Creating new Launch Template version..."
 
+                        cat > launch-template-data.json <<EOF
+                        {
+                          "UserData": "${USER_DATA}"
+                        }
+                        EOF
+
+                        echo "Validating JSON..."
+                        python3 -m json.tool launch-template-data.json > /dev/null
+                        echo "JSON validation successful."
+                        echo "Creating new Launch Template version..."
+
                         NEW_VERSION=$(aws ec2 create-launch-template-version \
                             --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
                             --source-version '$Default' \
                             --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
-                            --launch-template-data "{\"UserData\":\"${USER_DATA}\"}" \
+                            --launch-template-data file://launch-template-data.json \
+
                             --region "${AWS_REGION}" \
                             --query 'LaunchTemplateVersion.VersionNumber' \
                             --output text)
