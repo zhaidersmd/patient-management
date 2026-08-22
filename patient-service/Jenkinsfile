@@ -167,7 +167,7 @@ pipeline {
 
                         echo "New Launch Template version: ${NEW_VERSION}"
 
-                        echo "${NEW_VERSION}" > new_lt_version.txt
+                        echo "${NEW_VERSION}" > "${WORKSPACE}/new_lt_version.txt"
 
                         echo "Launch Template version saved."
                     '''
@@ -192,8 +192,8 @@ pipeline {
                             echo "ERROR: new_lt_version.txt not found"
                             exit 1
                         fi
-
-                        NEW_VERSION=$(cat new_lt_version.txt)
+                        VERSION_FILE="${WORKSPACE}/new_lt_version.txt"
+                        NEW_VERSION=$(tr -d '[:space:]' < "${VERSION_FILE}")
 
                         echo "ASG: ${ASG_NAME}"
                         echo "Launch Template: ${LAUNCH_TEMPLATE_ID}"
