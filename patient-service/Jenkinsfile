@@ -142,7 +142,9 @@ pipeline {
                         printf '{"UserData":"%s"}\n' "${USER_DATA}" > launch-template-data.json
 
                         echo "Validating JSON..."
-                        python3 -m json.tool launch-template-data.json > /dev/null
+
+                        jq empty launch-template-data.json
+
                         echo "JSON validation successful."
                         echo "Creating new Launch Template version..."
 
