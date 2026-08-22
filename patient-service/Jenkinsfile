@@ -6,6 +6,7 @@ pipeline {
         ECR_REGISTRY = '774118824657.dkr.ecr.ap-south-1.amazonaws.com'
         ECR_REPOSITORY = '774118824657.dkr.ecr.ap-south-1.amazonaws.com/patient-service'
         AWS_CREDENTIALS = 'aws-patient-service'
+        IAM_INSTANCE_PROFILE = 'patient-service-ec2-role-secretkey-rds'
 
         IMAGE_TAG = "${BUILD_NUMBER}"
 
@@ -139,7 +140,15 @@ pipeline {
 
                         echo "Creating new Launch Template version..."
 
-                        printf '{"UserData":"%s"}\n' "${USER_DATA}" > launch-template-data.json
+                        jq -n \
+                            --arg userData "${USER_DATA}" \
+                            --arg profileName "${IAM_INSTANCE_PROFILE}" \
+                            '{
+                                UserData: $userData,
+                                IamInstanceProfile: {
+                                    Name: $profileName
+                                }
+                            }' > launch-template-data.json
 
                         echo "Validating JSON..."
 
@@ -163,6 +172,15 @@ pipeline {
                         fi
 
                         echo "New Launch Template version: ${NEW_VERSION}"
+
+                        echo "Verifying IAM instance profile..."
+
+                        aws ec2 describe-launch-template-versions \
+                            --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
+                            --versions "${NEW_VERSION}" \
+                            --region "${AWS_REGION}" \
+                            --query 'LaunchTemplateVersions[0].LaunchTemplateData.IamInstanceProfile' \
+                            --output json
 
                         echo "${NEW_VERSION}" > "${WORKSPACE}/new_lt_version.txt"
 
