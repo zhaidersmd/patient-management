@@ -82,49 +82,53 @@ pipeline {
                             credentialsId: "${AWS_CREDENTIALS}"]
                     ]) {
                     sh '''
-                        set -e
+                      set -e
+                      echo "Creating Launch Template version"
+                      echo "Launch Template ID: ${LAUNCH_TEMPLATE_ID}"
+                      echo "Image tag: ${IMAGE_TAG}"
+                      echo "Build number: ${BUILD_NUMBER}"
 
-                        echo "========================================="
-                        echo "Creating Launch Template version"
-                        echo "Image tag: ${IMAGE_TAG}"
-                        echo "========================================="
 
-                        CURRENT_VERSION=$(aws ec2 describe-launch-template-versions \
-                            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
-                            --region ${AWS_REGION} \
-                            --query 'LaunchTemplates[0].DefaultVersionNumber' \
-                            --output text)
+                      if [ -z "${LAUNCH_TEMPLATE_ID}" ]; then
+                        echo "ERROR: LAUNCH_TEMPLATE_ID is empty"
+                        exit 1
+                      fi
 
-                        echo "Current Launch Template version: ${CURRENT_VERSION}"
+                      if [ -z "${IMAGE_TAG}" ]; then
+                        echo "ERROR: IMAGE_TAG is empty"
+                        exit 1
+                      fi
 
-                        # Generate User Data with the current image tag.
-                        sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
-                            patient-service/aws/user-data.sh \
-                            > generated-user-data.sh
+# Generate User Data with the image tag.
+sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
+    patient-service/aws/user-data.sh \
+    > generated-user-data.sh
 
-                        echo "Generated User Data successfully."
+echo "Generated User Data successfully."
 
-                        # Base64 encode User Data for AWS API.
-                        USER_DATA=$(base64 -w 0 generated-user-data.sh)
+# Base64 encode User Data.
+USER_DATA=$(base64 -w 0 generated-user-data.sh)
 
-                        aws ec2 create-launch-template-version \
-                            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
-                            --source-version ${CURRENT_VERSION} \
-                            --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
-                            --launch-template-data "{
-                                \\"UserData\\": \\"${USER_DATA}\\"
-                            }" \
-                            --region ${AWS_REGION} \
-                            --query 'LaunchTemplateVersion.VersionNumber' \
-                            --output text \
-                            > new_lt_version.txt
+echo "Creating new Launch Template version..."
 
-                        NEW_VERSION=$(cat new_lt_version.txt)
+NEW_VERSION=$(aws ec2 create-launch-template-version \
+    --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
+    --source-version '$Default' \
+    --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
+    --launch-template-data "{\"UserData\":\"${USER_DATA}\"}" \
+    --region "${AWS_REGION}" \
+    --query 'LaunchTemplateVersion.VersionNumber' \
+    --output text)
 
-                        echo "New Launch Template version: ${NEW_VERSION}"
+if [ -z "${NEW_VERSION}" ] || [ "${NEW_VERSION}" = "None" ]; then
+    echo "ERROR: Failed to create Launch Template version"
+    exit 1
+fi
 
-                        echo "${NEW_VERSION}" > new_lt_version.txt
-                    '''
+echo "New Launch Template version: ${NEW_VERSION}"
+
+
+                    }
                 }
             }
         }
