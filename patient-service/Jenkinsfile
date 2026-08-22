@@ -223,7 +223,7 @@ pipeline {
 
                         REFRESH_ID=$(aws autoscaling start-instance-refresh \
                             --auto-scaling-group-name "${ASG_NAME}" \
-                            --preferences MinHealthyPercentage=100,MaxHealthyPercentage=200,InstanceWarmup=60 \
+                            --preferences MinHealthyPercentage=0,MaxHealthyPercentage=100,InstanceWarmup=60 \
                             --region "${AWS_REGION}" \
                             --query 'InstanceRefreshId' \
                             --output text)
