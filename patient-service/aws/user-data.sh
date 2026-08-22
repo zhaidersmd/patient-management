@@ -113,11 +113,8 @@ SECRET=$(aws secretsmanager get-secret-value \
     --query SecretString \
     --output text)
 
-DB_USERNAME=$(echo "$SECRET" | python3 -c \
-'import sys,json; print(json.load(sys.stdin)["username"])')
-
-DB_PASSWORD=$(echo "$SECRET" | python3 -c \
-'import sys,json; print(json.load(sys.stdin)["password"])')
+DB_USERNAME=$(echo "$SECRET" | jq -r '.username')
+DB_PASSWORD=$(echo "$SECRET" | jq -r '.password')
 
 
 # ============================================================
