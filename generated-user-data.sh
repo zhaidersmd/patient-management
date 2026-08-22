@@ -4,7 +4,7 @@ set -e
 
 REGION="ap-south-1"
 ECR_REPO="774118824657.dkr.ecr.ap-south-1.amazonaws.com/patient-service"
-IMAGE_TAG="__IMAGE_TAG__"
+_IMAGE_TAG_="43"
 
 SECRET_ARN="arn:aws:secretsmanager:ap-south-1:774118824657:secret:patient-service/rds-agbOdR"
 

@@ -16,7 +16,7 @@ public class PatientServiceApplication {
 
     @GetMapping("/")
     public String welcomePage() {
-        return "Hi There, Welcome to Patient Service Module!!";
+        return "Hi There, Welcome to Patient Service Module!!curl -v localhost:4000/actuator/health";
     }
 
 
