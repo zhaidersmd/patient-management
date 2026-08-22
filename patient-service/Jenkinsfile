@@ -164,13 +164,11 @@ EOF
                         echo "Starting Instance Refresh..."
 
                         REFRESH_ID=$(aws autoscaling start-instance-refresh \
-                            --auto-scaling-group-name ${ASG_NAME} \
-                            --preferences \
-                                MinHealthyPercentage=100, \
-                                InstanceWarmup=120 \
-                            --region ${AWS_REGION} \
-                            --query 'InstanceRefreshId' \
-                            --output text)
+                          --auto-scaling-group-name ${ASG_NAME} \
+                          --preferences MinHealthyPercentage=100,InstanceWarmup=120 \
+                          --region ${AWS_REGION} \
+                          --query 'InstanceRefreshId' \
+                          --output text)
 
                         echo "Instance Refresh started: ${REFRESH_ID}"
 
