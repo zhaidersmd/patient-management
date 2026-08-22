@@ -44,7 +44,7 @@ pipeline {
                             -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
                     '''
                     echo "Docker image built:"
-                    docker images ${ECR_REPOSITORY}:${IMAGE_TAG}
+                    // docker images ${ECR_REPOSITORY}:${IMAGE_TAG}
                 }
             }
         }
