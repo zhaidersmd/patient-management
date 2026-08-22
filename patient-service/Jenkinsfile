@@ -7,6 +7,8 @@ pipeline {
         ECR_REPOSITORY = '774118824657.dkr.ecr.ap-south-1.amazonaws.com/patient-service'
         AWS_CREDENTIALS = 'aws-patient-service'
         IMAGE_TAG = "${BUILD_NUMBER}"
+        LAUNCH_TEMPLATE_ID = 'lt-0e1a3ca54608fee29'
+        ASG_NAME = 'patient-service-asg'
     }
 
     stages {
@@ -36,7 +38,7 @@ pipeline {
             steps {
                 dir('patient-service') {
                     sh '''
-                        docker build \
+                        docker build --platform linux/amd64 \
                             -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
                     '''
                 }
@@ -67,7 +69,168 @@ pipeline {
                 '''
             }
         }
+
+        stage('Create Launch Template Version') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
+
+                        echo "Getting current Launch Template User Data..."
+
+                        aws ec2 describe-launch-template-versions \
+                            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
+                            --versions '$Latest' \
+                            --region ${AWS_REGION} \
+                            --query 'LaunchTemplateVersions[0].LaunchTemplateData.UserData' \
+                            --output text > userdata.b64
+
+                        echo "Decoding User Data..."
+
+                        base64 -d userdata.b64 > userdata.sh
+
+                        echo "Updating IMAGE_TAG to ${BUILD_NUMBER}..."
+
+                        sed -i \
+                            "s/^IMAGE_TAG=.*/IMAGE_TAG=\\"${BUILD_NUMBER}\\"/" \
+                            userdata.sh
+
+                        echo "Encoding updated User Data..."
+
+                        USERDATA_B64=$(base64 -w 0 userdata.sh)
+
+                        cat > launch-template-data.json <<EOF
+{
+    "UserData": "${USERDATA_B64}"
+}
+EOF
+
+                        echo "Creating new Launch Template version..."
+
+                        NEW_VERSION=$(aws ec2 create-launch-template-version \
+                            --launch-template-id ${LAUNCH_TEMPLATE_ID} \
+                            --source-version '$Latest' \
+                            --version-description "Jenkins build ${BUILD_NUMBER}" \
+                            --launch-template-data file://launch-template-data.json \
+                            --region ${AWS_REGION} \
+                            --query 'LaunchTemplateVersion.VersionNumber' \
+                            --output text)
+
+                        echo "Created Launch Template version: ${NEW_VERSION}"
+
+                        echo "${NEW_VERSION}" > new_lt_version.txt
+                    '''
+                }
+            }
+        }
+
+        stage('Update Auto Scaling Group') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
+
+                        NEW_VERSION=$(cat new_lt_version.txt)
+
+                        echo "Updating ASG to Launch Template version ${NEW_VERSION}..."
+
+                        aws autoscaling update-auto-scaling-group \
+                            --auto-scaling-group-name ${ASG_NAME} \
+                            --launch-template \
+                                LaunchTemplateId=${LAUNCH_TEMPLATE_ID},Version=${NEW_VERSION} \
+                            --region ${AWS_REGION}
+
+                        echo "ASG updated successfully."
+                    '''
+                }
+            }
+        }
+
+        stage('Start Instance Refresh') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
+
+                        echo "Starting Instance Refresh..."
+
+                        REFRESH_ID=$(aws autoscaling start-instance-refresh \
+                            --auto-scaling-group-name ${ASG_NAME} \
+                            --preferences \
+                                MinHealthyPercentage=100, \
+                                InstanceWarmup=120 \
+                            --region ${AWS_REGION} \
+                            --query 'InstanceRefreshId' \
+                            --output text)
+
+                        echo "Instance Refresh started: ${REFRESH_ID}"
+
+                        echo "${REFRESH_ID}" > refresh_id.txt
+                    '''
+                }
+            }
+
+        }
+        stage('Wait For Deployment') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
+
+                        REFRESH_ID=$(cat refresh_id.txt)
+
+                        echo "Waiting for Instance Refresh ${REFRESH_ID}..."
+
+                        for i in $(seq 1 60); do
+
+                            STATUS=$(aws autoscaling describe-instance-refreshes \
+                                --auto-scaling-group-name ${ASG_NAME} \
+                                --instance-refresh-ids ${REFRESH_ID} \
+                                --region ${AWS_REGION} \
+                                --query 'InstanceRefreshes[0].Status' \
+                                --output text)
+
+                            echo "Instance Refresh status: ${STATUS}"
+
+                            case "$STATUS" in
+
+                                Successful)
+                                    echo "Deployment completed successfully."
+                                    exit 0
+                                    ;;
+
+                                Failed|Cancelled|RollbackFailed)
+                                    echo "Deployment failed with status: ${STATUS}"
+                                    exit 1
+                                    ;;
+
+                                *)
+                                    sleep 20
+                                    ;;
+                            esac
+
+                        done
+
+                        echo "Deployment timed out."
+                        exit 1
+                    '''
+                }
+            }
+        }
     }
+
 
     post {
         success {
