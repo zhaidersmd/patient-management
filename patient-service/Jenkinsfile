@@ -121,9 +121,9 @@ pipeline {
 
                         echo "Generating User Data..."
 
-                        sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
-                            patient-service/aws/user-data.sh \
-                            > generated-user-data.sh
+                       sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
+                           patient-service/aws/user-data.sh \
+                           > generated-user-data.sh
 
                         echo "Generated User Data:"
                         cat generated-user-data.sh
