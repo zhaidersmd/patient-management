@@ -270,22 +270,23 @@ pipeline {
                     echo "Application health check passed."
                 }
             }
-        }
 
 
-        post {
-            success {
-                echo "CI pipeline completed successfully."
-                echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
-            }
 
-            failure {
-                echo "CI pipeline failed."
-            }
+            post {
+                success {
+                    echo "CI pipeline completed successfully."
+                    echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
+                }
 
-            always {
-                sh 'docker logout ${ECR_REGISTRY} || true'
+                failure {
+                    echo "CI pipeline failed."
+                }
 
+                always {
+                    sh 'docker logout ${ECR_REGISTRY} || true'
+
+                }
             }
         }
     }
