@@ -92,7 +92,7 @@ pipeline {
                         CURRENT_VERSION=$(aws ec2 describe-launch-template-versions \
                             --launch-template-id ${LAUNCH_TEMPLATE_ID} \
                             --region ${AWS_REGION} \
-                            --query 'max_by(Versions, &VersionNumber).VersionNumber' \
+                            --query 'LaunchTemplates[0].DefaultVersionNumber' \
                             --output text)
 
                         echo "Current Launch Template version: ${CURRENT_VERSION}"
