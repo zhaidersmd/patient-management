@@ -10,6 +10,8 @@ import com.pm.patientservice.mapper.PatientMapper;
 import com.pm.patientservice.model.Patient;
 import com.pm.patientservice.repository.PatientRepository;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -19,6 +21,7 @@ import java.util.UUID;
 @Service
 public class PatientService {
 
+    private static final Logger log = LoggerFactory.getLogger(PatientService.class);
     private final PatientRepository patientRepository;
     private final BillingServiceGrpcClient billingServiceGrpcClient;
     private final KafkaProducer kafkaProducer;
@@ -37,19 +40,23 @@ public class PatientService {
     }
 
     public PatientResponseDTO createPatient(PatientRequestDTO patientRequestDTO) {
+
         if (patientRepository.existsByEmail(patientRequestDTO.getEmail())) {
 
             throw new EmailAlreadyExistsException("A patient with this email already exists "
                         + patientRequestDTO.getEmail());
 
         }
+
         Patient newPatient = patientRepository.save(PatientMapper.toModel(patientRequestDTO));
+        log.info("Sending the customer details to Billing Service {}", newPatient.toString());
+
         billingServiceGrpcClient.createBillingAccount(newPatient.getId().toString(),
                 newPatient.getName(),
                 newPatient.getEmail());
 
         // Sending event to kafka after billing
-        kafkaProducer.sendEvent(newPatient);
+        //kafkaProducer.sendEvent(newPatient);
 
         return PatientMapper.toDTO(newPatient);
     }
