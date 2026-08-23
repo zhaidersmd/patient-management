@@ -156,7 +156,7 @@ pipeline {
 
                     USER_DATA=$(base64 -w 0 billing-user-data.sh)
 
-
+                    jq empty launch-template-data.json
                     jq -n \
                          --arg userData "$USER_DATA" \
                          '{UserData: $userData}' \
@@ -164,7 +164,7 @@ pipeline {
 
 
 
-                    jq empty launch-template-data.json
+
                     cat launch-template-data.json
 
                     VERSION=$(aws ec2 create-launch-template-version \
