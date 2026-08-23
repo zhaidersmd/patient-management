@@ -345,50 +345,43 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify Billing Deployment') {
             steps {
-                script {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: "${AWS_CREDENTIALS}"]
+                ]) {
+                    sh '''
+                        set -e
 
-                    timeout(time: 3, unit: 'MINUTES') {
+                        echo "======================================"
+                        echo "Checking Billing Target Health"
+                        echo "======================================"
 
-                        waitUntil {
+                        for i in $(seq 1 30); do
 
-                            def status = sh(
-                                script: """
-                                    curl -s \
-                                         -o /tmp/health.json \
-                                         -w "%{http_code}" \
-                                         ${HEALTH_URL}
-                                """,
-                                returnStdout: true
-                            ).trim()
+                            HEALTH=$(aws elbv2 describe-target-health \
+                                --target-group-arn "${BILLING_TARGET_GROUP_ARN}" \
+                                --region "${AWS_REGION}" \
+                                --query 'TargetHealthDescriptions[*].TargetHealth.State' \
+                                --output text)
 
-                            def response = sh(
-                                script: """
-                                    cat /tmp/health.json
-                                """,
-                                returnStdout: true
-                            ).trim()
+                            echo "Attempt ${i}/30"
+                            echo "Target health: ${HEALTH}"
 
-                            echo "HTTP Status: ${status}"
-                            echo "Health Response: ${response}"
+                            if echo "${HEALTH}" | grep -q "healthy"; then
+                                echo "Billing target is healthy."
+                                exit 0
+                            fi
 
-                            if (status == '200' &&
-                                response.contains('"status":"UP"')) {
-
-                                echo "Application health check passed."
-
-                                return true
-                            }
-
-                            echo "Application is not healthy yet."
-                            echo "Waiting 10 seconds..."
-
+                            echo "Billing target is not healthy yet."
                             sleep 10
 
-                            return false
-                        }
-                    }
+                        done
+
+                        echo "Billing target did not become healthy."
+                        exit 1
+                    '''
                 }
             }
         }
