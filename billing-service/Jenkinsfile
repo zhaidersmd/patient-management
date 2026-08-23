@@ -81,7 +81,7 @@ pipeline {
                 '''
             }
         }
-    
+
 
     stage('Verify ECR Image') {
         steps {
@@ -116,4 +116,4 @@ pipeline {
             '''
         }
     }
-}
+}}
