@@ -48,11 +48,11 @@ pipeline {
 
                         docker build \
                             --platform linux/amd64 \
-                            -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
+                            -t "${IMAGE_NAME}" . \
                     '''
 
                     sh '''
-                        docker image inspect ${ECR_REPOSITORY}:${IMAGE_TAG}
+                        docker image inspect  "${IMAGE_NAME}"
                     '''
                 }
             }
@@ -79,10 +79,7 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-            withCredentials([
-                                    [$class: 'AmazonWebServicesCredentialsBinding',
-                                        credentialsId: "${AWS_CREDENTIALS}"]
-                                ]) {
+
                 sh '''
                     set -e
 
@@ -95,9 +92,9 @@ pipeline {
                     echo "Pushing image:"
                     echo "${ECR_REPOSITORY}:${IMAGE_TAG}"
 
-                    docker push ${ECR_REPOSITORY}:${IMAGE_TAG}
+                    docker push  "${IMAGE_NAME}"
                 '''
-            }}
+            }
         }
 
         stage('Create Launch Template Version') {
