@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="f7163930-67ee-4d13-979f-45c31698edb5" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/patient-service/src/main/java/com/pm/patientservice/service/PatientService.java" beforeDir="false" afterPath="$PROJECT_DIR$/patient-service/src/main/java/com/pm/patientservice/service/PatientService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/patient-service/Jenkinsfile" beforeDir="false" afterPath="$PROJECT_DIR$/patient-service/Jenkinsfile" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -96,7 +96,7 @@
       <recent name="com.pm.integrationtests" />
     </key>
   </component>
-  <component name="RunManager" selected="Application.PatientServiceApplication">
+  <component name="RunManager" selected="Spring Boot.BillingServiceApplication">
     <configuration name="PatientServiceApplication" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="com.pm.patientservice.PatientServiceApplication" />
       <module name="patient-service" />
@@ -162,8 +162,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Application.PatientServiceApplication" />
         <item itemvalue="Spring Boot.BillingServiceApplication" />
+        <item itemvalue="Application.PatientServiceApplication" />
         <item itemvalue="JUnit.PatientIntegrationTest.shouldReturnPatientsWithValidToken" />
         <item itemvalue="JUnit.AuthIntegrationTest.shouldReturnOKWithValidToken" />
         <item itemvalue="JUnit.AuthIntegrationTest" />
