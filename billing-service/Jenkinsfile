@@ -25,11 +25,12 @@ pipeline {
 
         stage('Build & Test') {
             steps {
+            dir('patient-service') {
                 sh '''
                     set -e
                     mvn -B clean test
                 '''
-            }
+            }}
         }
 
         stage('Docker Build') {
