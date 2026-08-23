@@ -9,10 +9,13 @@ pipeline {
         ECR_REPOSITORY = 'billing-service'
 
         IMAGE_TAG = "${BUILD_NUMBER}"
+        ASG_NAME = 'billing-service-asg'
+        LAUNCH_TEMPLATE_ID = 'lt-081eb86844a4e5049'
 
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
         IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+        BILLING_TARGET_GROUP_ARN = 'arn:aws:elasticloadbalancing:ap-south-1:774118824657:targetgroup/billing-grpc-tg/5f74910594b1d0d6'
     }
 
     stages {
@@ -30,7 +33,9 @@ pipeline {
                     set -e
                     mvn -B clean test
                 '''
-            }}
+            }
+            }
+
         }
 
         stage('Docker Build') {
@@ -102,7 +107,220 @@ pipeline {
                 echo "ECR image verification successful."
             '''
         }
-    }} }
+    }}
+
+    stage('Create Launch Template Version') {
+
+        steps {
+
+            withCredentials([
+                [$class: 'AmazonWebServicesCredentialsBinding',
+                 credentialsId: "${AWS_CREDENTIALS}"]
+            ]) {
+
+                sh '''
+                    set -e
+
+                    echo "Creating new Launch Template version..."
+                    echo "Image: $IMAGE_NAME"
+
+                    cat > /tmp/billing-user-data.sh <<EOF
+    #!/bin/bash
+
+    set -e
+
+    REGION="ap-south-1"
+    ECR_REPO="774118824657.dkr.ecr.ap-south-1.amazonaws.com/billing-service"
+    IMAGE_TAG="$IMAGE_TAG"
+
+    dnf install -y docker
+
+    systemctl enable --now docker
+
+    aws ecr get-login-password \
+        --region "$REGION" | \
+    docker login \
+        --username AWS \
+        --password-stdin "$ECR_REPO"
+
+    docker pull "$ECR_REPO:$IMAGE_TAG"
+
+    docker rm -f billing-service 2>/dev/null || true
+
+    docker run -d \
+        --name billing-service \
+        --restart unless-stopped \
+        -p 9001:9001 \
+        "$ECR_REPO:$IMAGE_TAG"
+    EOF
+
+                    USER_DATA=$(base64 -w 0 /tmp/billing-user-data.sh)
+
+                    VERSION=$(aws ec2 create-launch-template-version \
+                        --launch-template-id "$LAUNCH_TEMPLATE_ID" \
+                        --source-version '$Latest' \
+                        --launch-template-data "{\"UserData\":\"$USER_DATA\"}" \
+                        --region "$AWS_REGION" \
+                        --query 'LaunchTemplateVersion.VersionNumber' \
+                        --output text)
+
+                    echo "Created Launch Template version: $VERSION"
+
+                    echo "$VERSION" > /tmp/billing-lt-version'''
+                }
+            }
+        }
+
+
+    stage('Update ASG Launch Template') {
+
+        steps {
+
+            withCredentials([
+                [$class: 'AmazonWebServicesCredentialsBinding',
+                 credentialsId: "${AWS_CREDENTIALS}"]
+            ]) {
+
+                sh '''
+                    set -e
+
+                    VERSION=$(cat /tmp/billing-lt-version)
+
+                    echo "Updating ASG..."
+                    echo "Launch Template version: $VERSION"
+
+                    aws autoscaling update-auto-scaling-group \
+                        --auto-scaling-group-name "$ASG_NAME" \
+                        --launch-template \
+                        LaunchTemplateId="$LAUNCH_TEMPLATE_ID",Version="$VERSION" \
+                        --region "$AWS_REGION"
+
+                    echo "ASG updated successfully."
+                '''
+            }
+        }
+    }
+
+    stage('Start Instance Refresh') {
+
+        steps {
+
+            withCredentials([
+                [$class: 'AmazonWebServicesCredentialsBinding',
+                 credentialsId: "${AWS_CREDENTIALS}"]
+            ]) {
+
+                sh '''
+                    set -e
+
+                    echo "Starting Billing Service Instance Refresh..."
+
+                    REFRESH_ID=$(aws autoscaling start-instance-refresh \
+                        --auto-scaling-group-name "$ASG_NAME" \
+                        --preferences \
+                        MinHealthyPercentage=100,InstanceWarmup=120 \
+                        --region "$AWS_REGION" \
+                        --query 'InstanceRefreshId' \
+                        --output text)
+
+                    echo "Instance Refresh started:"
+                    echo "$REFRESH_ID"
+
+                    echo "$REFRESH_ID" > /tmp/billing-refresh-id
+                '''
+            }
+        }
+    }
+
+    stage('Wait for Instance Refresh') {
+
+        steps {
+
+            withCredentials([
+                [$class: 'AmazonWebServicesCredentialsBinding',
+                 credentialsId: "${AWS_CREDENTIALS}"]
+            ]) {
+
+                sh '''
+                    set -e
+
+                    REFRESH_ID=$(cat /tmp/billing-refresh-id)
+
+                    echo "Waiting for Instance Refresh..."
+
+                    for i in $(seq 1 30)
+                    do
+
+                        STATUS=$(aws autoscaling describe-instance-refreshes \
+                            --auto-scaling-group-name "$ASG_NAME" \
+                            --instance-refresh-ids "$REFRESH_ID" \
+                            --region "$AWS_REGION" \
+                            --query 'InstanceRefreshes[0].Status' \
+                            --output text)
+
+                        echo "Instance Refresh status: $STATUS"
+
+                        if [ "$STATUS" = "Successful" ]; then
+                            echo "Billing deployment successful."
+                            exit 0
+                        fi
+
+                        if [ "$STATUS" = "Failed" ] || \
+                           [ "$STATUS" = "Cancelled" ]; then
+                            echo "Billing deployment failed."
+                            exit 1
+                        fi
+
+                        sleep 20
+                    done
+
+                    echo "Timed out waiting for Instance Refresh."
+                    exit 1
+                '''
+            }
+        }
+    }
+
+    stage('Verify Billing Target Health') {
+
+        steps {
+
+            withCredentials([
+                [$class: 'AmazonWebServicesCredentialsBinding',
+                 credentialsId: "${AWS_CREDENTIALS}"]
+            ]) {
+
+                sh '''
+                    set -e
+
+                    echo "Checking Billing NLB target health..."
+
+                    for i in $(seq 1 15)
+                    do
+
+                        HEALTH=$(aws elbv2 describe-target-health \
+                            --target-group-arn "$BILLING_TARGET_GROUP_ARN" \
+                            --region "$AWS_REGION" \
+                            --query 'TargetHealthDescriptions[?TargetHealth.State==`healthy`].Target.Id' \
+                            --output text)
+
+                        if [ -n "$HEALTH" ]; then
+                            echo "Billing target is healthy."
+                            echo "$HEALTH"
+                            exit 0
+                        fi
+
+                        echo "Billing target not healthy yet..."
+                        sleep 10
+                    done
+
+                    echo "Billing target did not become healthy."
+                    exit 1
+                '''
+            }
+        }
+    }
+    }
 
     post {
         success {
