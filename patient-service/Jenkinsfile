@@ -27,7 +27,7 @@ pipeline {
         stage('Build & Test') {
             steps {
                 withEnv([
-                        'SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres',
+                        'SPRING_DATASOURCE_URL=jdbc:postgresql://patientdb2.cxeseem0ax4c.ap-south-1.rds.amazonaws.com:5433/postgres',
                         'SPRING_DATASOURCE_USERNAME=postgres',
                         'SPRING_DATASOURCE_PASSWORD=postgres',
                         'BILLING_SERVICE_ADDRESS=10.0.12.119',

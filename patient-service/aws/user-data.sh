@@ -11,6 +11,8 @@ SECRET_ARN="arn:aws:secretsmanager:ap-south-1:774118824657:secret:patient-servic
 RDS_HOST="patientdb2.cxeseem0ax4c.ap-south-1.rds.amazonaws.com"
 RDS_PORT="5432"
 RDS_DB="postgres"
+BILLING_SERVICE_ADDRESS="10.0.12.119"
+BILLING_SERVICE_GRPC_PORT="9001"
 
 
 # ============================================================
@@ -138,5 +140,7 @@ docker run -d \
     -e SPRING_DATASOURCE_URL="jdbc:postgresql://$RDS_HOST:$RDS_PORT/$RDS_DB" \
     -e SPRING_DATASOURCE_USERNAME="$DB_USERNAME" \
     -e SPRING_DATASOURCE_PASSWORD="$DB_PASSWORD" \
+    -e BILLING_SERVICE_ADDRESS=$BILLING_SERVICE_ADDRESS \
+    -e BILLING_SERVICE_GRPC_PORT=$BILLING_SERVICE_GRPC_PORT \
     -e SPRING_SQL_INIT_MODE="always" \
     "$ECR_REPO:$IMAGE_TAG"
