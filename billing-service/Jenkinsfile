@@ -85,6 +85,10 @@ pipeline {
 
     stage('Verify ECR Image') {
         steps {
+         withCredentials([
+                                [$class: 'AmazonWebServicesCredentialsBinding',
+                                    credentialsId: "${AWS_CREDENTIALS}"]
+                            ]) {
             sh '''
                 set -e
 
@@ -98,7 +102,7 @@ pipeline {
                 echo "ECR image verification successful."
             '''
         }
-    }}
+    }} }
 
     post {
         success {
