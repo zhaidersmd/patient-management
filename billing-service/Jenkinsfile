@@ -1,5 +1,4 @@
 pipeline {
-
     agent any
 
     environment {
@@ -28,50 +27,54 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-            dir('billing-service') {
-                sh '''
-                    set -e
-                    mvn -B clean test
-                '''
+                dir('billing-service') {
+                    dir('billing-service') {
+                        sh '''
+                            set -e
+                            mvn -B clean test
+                        '''
+                    }
+                }
             }
-            }
-
         }
 
         stage('Docker Build') {
-
             steps {
-            dir('billing-service') {
-                sh '''
-                    set -e
+                dir('billing-service') {
+                    echo "Building Docker image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
 
-                    echo "Building Docker image:"
-                    echo "$IMAGE_NAME"
+                    sh '''
+                        set -e
 
-                    docker build \
-                        --platform linux/amd64 \
-                        -t "$IMAGE_NAME" \
-                        .
-                '''
-            }}
+                        docker build \
+                            --platform linux/amd64 \
+                            -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
+                    '''
+
+                    sh '''
+                        docker image inspect ${ECR_REPOSITORY}:${IMAGE_TAG}
+                    '''
+                }
+            }
         }
 
         stage('ECR Login') {
             steps {
-             withCredentials([
+                withCredentials([
                         [$class: 'AmazonWebServicesCredentialsBinding',
                             credentialsId: "${AWS_CREDENTIALS}"]
                     ]) {
-                sh '''
-                    set -e
+                    sh '''
+                        set -e
 
-                    aws ecr get-login-password \
-                        --region "$AWS_REGION" | \
-                    docker login \
-                        --username AWS \
-                        --password-stdin "$ECR_REGISTRY"
-                '''
-            }}
+                        aws ecr get-login-password \
+                            --region ${AWS_REGION} | \
+                        docker login \
+                            --username AWS \
+                            --password-stdin ${ECR_REGISTRY}
+                    '''
+                }
+            }
         }
 
         stage('Push to ECR') {
@@ -79,311 +82,313 @@ pipeline {
                 sh '''
                     set -e
 
-                    docker push "$IMAGE_NAME"
+                    echo "Pushing image:"
+                    echo "${ECR_REPOSITORY}:${IMAGE_TAG}"
 
-                    echo "Successfully pushed:"
-                    echo "$IMAGE_NAME"
+                    docker push ${ECR_REPOSITORY}:${IMAGE_TAG}
                 '''
             }
         }
 
+        stage('Create Launch Template Version') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
 
-    stage('Verify ECR Image') {
-        steps {
-         withCredentials([
-                                [$class: 'AmazonWebServicesCredentialsBinding',
-                                    credentialsId: "${AWS_CREDENTIALS}"]
-                            ]) {
-            sh '''
-                set -e
+                        echo "======================================"
+                        echo "Creating Launch Template version"
+                        echo "======================================"
 
-                echo "Verifying image exists in ECR..."
+                        echo "Launch Template: ${LAUNCH_TEMPLATE_ID}"
+                        echo "Image tag:       ${IMAGE_TAG}"
+                        echo "Build number:    ${BUILD_NUMBER}"
 
-                aws ecr describe-images \
-                    --repository-name "$ECR_REPOSITORY" \
-                    --image-ids imageTag="$IMAGE_TAG" \
-                    --region "$AWS_REGION"
-
-                echo "ECR image verification successful."
-            '''
-        }
-    }}
-
-    stage('Create Launch Template Version') {
-
-        steps {
-
-            withCredentials([
-                [$class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: "${AWS_CREDENTIALS}"]
-            ]) {
-
-                sh '''
-                    set -e
-
-                    echo "======================================"
-                    echo "Creating Launch Template version"
-                    echo "======================================"
-
-                    echo "Launch Template: ${LAUNCH_TEMPLATE_ID}"
-                    echo "Image tag:       ${IMAGE_TAG}"
-                    echo "Build number:    ${BUILD_NUMBER}"
-
-                    if [ -z "${LAUNCH_TEMPLATE_ID}" ]; then
-                        echo "ERROR: LAUNCH_TEMPLATE_ID is empty"
-                        exit 1
-                    fi
-
-                    if [ -z "${IMAGE_TAG}" ]; then
-                        echo "ERROR: IMAGE_TAG is empty"
-                        exit 1
-                    fi
-
-                    echo "Generating User Data..."
-
-                    sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
-                        billing-service/aws/user-data.sh \
-                        > generated-user-data.sh
-
-                    echo "Generated User Data:"
-                    cat generated-user-data.sh
-
-                    echo "Encoding User Data..."
-
-                    USER_DATA=$(base64 -w 0 generated-user-data.sh)
-
-                    if [ -z "${USER_DATA}" ]; then
-                        echo "ERROR: User Data encoding failed"
-                        exit 1
-                    fi
-
-                    echo "Creating Launch Template JSON..."
-
-                    echo "Reading current Launch Template configuration..."
-
-                    CURRENT_LT_DATA=$(aws ec2 describe-launch-template-versions \
-                        --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
-                        --versions '$Latest' \
-                        --region "${AWS_REGION}" \
-                        --query 'LaunchTemplateVersions[0].LaunchTemplateData' \
-                        --output json)
-
-                    echo "Current Launch Template configuration:"
-                    echo "$CURRENT_LT_DATA" | jq 'del(.UserData)'
-
-                    echo "Creating new Launch Template configuration..."
-
-                    echo "$CURRENT_LT_DATA" | \
-                    jq --arg userData "$USER_DATA" \
-                       '.UserData = $userData' \
-                       > launch-template-data.json
-
-                    echo "Validating JSON..."
-
-                    jq empty launch-template-data.json
-
-                    echo "New Launch Template configuration:"
-                    jq 'del(.UserData)' launch-template-data.json
-
-                    echo "Creating new Launch Template version..."
-
-                    NEW_VERSION=$(aws ec2 create-launch-template-version \
-                        --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
-                        --source-version '$Latest' \
-                        --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
-                        --launch-template-data file://launch-template-data.json \
-                        --region "${AWS_REGION}" \
-                        --query 'LaunchTemplateVersion.VersionNumber' \
-                        --output text)
-
-                    if [ -z "${NEW_VERSION}" ] || [ "${NEW_VERSION}" = "None" ]; then
-                        echo "ERROR: Failed to create Launch Template version"
-                        exit 1
-                    fi
-
-                    echo "New Launch Template version: ${NEW_VERSION}"
-
-                    echo "Verifying Launch Template version..."
-
-                    aws ec2 describe-launch-template-versions \
-                        --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
-                        --versions "${NEW_VERSION}" \
-                        --region "${AWS_REGION}" \
-                        --query 'LaunchTemplateVersions[0].LaunchTemplateData' \
-                        --output json
-
-                    echo "${NEW_VERSION}" > "${WORKSPACE}/new_lt_version.txt"
-
-                    echo "Launch Template version saved."
-                '''
-            }
-        }
-    }
-
-
-    stage('Update ASG Launch Template') {
-
-        steps {
-
-            withCredentials([
-                [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: "${AWS_CREDENTIALS}"]
-            ]) {
-
-                sh '''
-                    set -e
-
-                    VERSION=$(cat "${WORKSPACE}/new_lt_version.txt")
-
-                    echo "Updating ASG..."
-                    echo "Launch Template version: $VERSION"
-
-                    aws autoscaling update-auto-scaling-group \
-                        --auto-scaling-group-name "$ASG_NAME" \
-                        --launch-template \
-                        LaunchTemplateId="$LAUNCH_TEMPLATE_ID",Version="$VERSION" \
-                        --region "$AWS_REGION"
-
-                    echo "ASG updated successfully."
-                '''
-            }
-        }
-    }
-
-    stage('Start Instance Refresh') {
-
-        steps {
-
-            withCredentials([
-                [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: "${AWS_CREDENTIALS}"]
-            ]) {
-
-                sh '''
-                    set -e
-
-                    echo "Starting Billing Service Instance Refresh..."
-
-                    REFRESH_ID=$(aws autoscaling start-instance-refresh \
-                        --auto-scaling-group-name "$ASG_NAME" \
-                        --preferences \
-                        MinHealthyPercentage=100,InstanceWarmup=120 \
-                        --region "$AWS_REGION" \
-                        --query 'InstanceRefreshId' \
-                        --output text)
-
-                    echo "Instance Refresh started:"
-                    echo "$REFRESH_ID"
-
-                    echo "$REFRESH_ID" > "${WORKSPACE}/billing-refresh-id.txt"
-                '''
-            }
-        }
-    }
-
-    stage('Wait for Instance Refresh') {
-
-        steps {
-
-            withCredentials([
-                [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: "${AWS_CREDENTIALS}"]
-            ]) {
-
-                sh '''
-                    set -e
-
-                    REFRESH_ID=$(cat "${WORKSPACE}/billing-refresh-id.txt")
-
-                    echo "Waiting for Instance Refresh..."
-
-                    for i in $(seq 1 30)
-                    do
-
-                        STATUS=$(aws autoscaling describe-instance-refreshes \
-                            --auto-scaling-group-name "$ASG_NAME" \
-                            --instance-refresh-ids "$REFRESH_ID" \
-                            --region "$AWS_REGION" \
-                            --query 'InstanceRefreshes[0].Status' \
-                            --output text)
-
-                        echo "Instance Refresh status: $STATUS"
-
-                        if [ "$STATUS" = "Successful" ]; then
-                            echo "Billing deployment successful."
-                            exit 0
-                        fi
-
-                        if [ "$STATUS" = "Failed" ] || \
-                           [ "$STATUS" = "Cancelled" ]; then
-                            echo "Billing deployment failed."
+                        if [ -z "${LAUNCH_TEMPLATE_ID}" ]; then
+                            echo "ERROR: LAUNCH_TEMPLATE_ID is empty"
                             exit 1
                         fi
 
-                        sleep 20
-                    done
-
-                    echo "Timed out waiting for Instance Refresh."
-                    exit 1
-                '''
-            }
-        }
-    }
-
-    stage('Verify Billing Target Health') {
-
-        steps {
-
-            withCredentials([
-                [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: "${AWS_CREDENTIALS}"]
-            ]) {
-
-                sh '''
-                    set -e
-
-                    echo "Checking Billing NLB target health..."
-
-                    for i in $(seq 1 15)
-                    do
-
-                        HEALTH=$(aws elbv2 describe-target-health \
-                            --target-group-arn "$BILLING_TARGET_GROUP_ARN" \
-                            --region "$AWS_REGION" \
-                            --query 'TargetHealthDescriptions[?TargetHealth.State==`healthy`].Target.Id' \
-                            --output text)
-
-                        if [ -n "$HEALTH" ]; then
-                            echo "Billing target is healthy."
-                            echo "$HEALTH"
-                            exit 0
+                        if [ -z "${IMAGE_TAG}" ]; then
+                            echo "ERROR: IMAGE_TAG is empty"
+                            exit 1
                         fi
 
-                        echo "Billing target not healthy yet..."
-                        sleep 10
-                    done
+                        echo "Generating User Data..."
 
-                    echo "Billing target did not become healthy."
-                    exit 1
-                '''
+                       sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
+                           billing-service/aws/user-data.sh \
+                           > generated-user-data.sh
+
+                        echo "Generated User Data:"
+                        cat generated-user-data.sh
+
+                        echo "Encoding User Data..."
+
+                        USER_DATA=$(base64 -w 0 generated-user-data.sh)
+
+                        if [ -z "${USER_DATA}" ]; then
+                            echo "ERROR: User Data encoding failed"
+                            exit 1
+                        fi
+
+                        echo "Creating new Launch Template version..."
+
+                        jq -n \
+                            --arg userData "${USER_DATA}" \
+                            --arg profileName "${IAM_INSTANCE_PROFILE}" \
+                            '{
+                                UserData: $userData,
+                                IamInstanceProfile: {
+                                    Name: $profileName
+                                }
+                            }' > launch-template-data.json
+
+                        echo "Validating JSON..."
+
+                        jq empty launch-template-data.json
+
+                        echo "JSON validation successful."
+                        echo "Creating new Launch Template version..."
+
+                        NEW_VERSION=$(aws ec2 create-launch-template-version \
+                            --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
+                            --source-version '$Default' \
+                            --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
+                            --launch-template-data file://launch-template-data.json \
+                            --region "${AWS_REGION}" \
+                            --query 'LaunchTemplateVersion.VersionNumber' \
+                            --output text)
+
+                        if [ -z "${NEW_VERSION}" ] || [ "${NEW_VERSION}" = "None" ]; then
+                            echo "ERROR: Failed to create Launch Template version"
+                            exit 1
+                        fi
+
+                        echo "New Launch Template version: ${NEW_VERSION}"
+
+                        echo "Verifying IAM instance profile..."
+
+                        aws ec2 describe-launch-template-versions \
+                            --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
+                            --versions "${NEW_VERSION}" \
+                            --region "${AWS_REGION}" \
+                            --query 'LaunchTemplateVersions[0].LaunchTemplateData.IamInstanceProfile' \
+                            --output json
+
+                        echo "${NEW_VERSION}" > "${WORKSPACE}/new_lt_version.txt"
+
+                        echo "Launch Template version saved."
+                    '''
+                }
             }
         }
-    }
+
+        stage('Update Auto Scaling Group') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
+
+                        echo "======================================"
+                        echo "Updating Auto Scaling Group"
+                        echo "======================================"
+
+                        if [ ! -f new_lt_version.txt ]; then
+                            echo "ERROR: new_lt_version.txt not found"
+                            exit 1
+                        fi
+                        VERSION_FILE="${WORKSPACE}/new_lt_version.txt"
+                        NEW_VERSION=$(tr -d '[:space:]' < "${VERSION_FILE}")
+
+                        echo "ASG: ${ASG_NAME}"
+                        echo "Launch Template: ${LAUNCH_TEMPLATE_ID}"
+                        echo "Version: ${NEW_VERSION}"
+
+                        aws autoscaling update-auto-scaling-group \
+                            --auto-scaling-group-name "${ASG_NAME}" \
+                            --launch-template \
+                                LaunchTemplateId="${LAUNCH_TEMPLATE_ID}",Version="${NEW_VERSION}" \
+                            --region "${AWS_REGION}"
+
+                        echo "ASG updated successfully."
+                    '''
+                }
+            }
+        }
+
+        stage('Start Instance Refresh') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
+
+                        echo "======================================"
+                        echo "Starting Instance Refresh"
+                        echo "======================================"
+
+                        REFRESH_ID=$(aws autoscaling start-instance-refresh \
+                            --auto-scaling-group-name "${ASG_NAME}" \
+                            --preferences MinHealthyPercentage=0,MaxHealthyPercentage=100,InstanceWarmup=300 \
+                            --region "${AWS_REGION}" \
+                            --query 'InstanceRefreshId' \
+                            --output text)
+
+                        if [ -z "${REFRESH_ID}" ] || [ "${REFRESH_ID}" = "None" ]; then
+                            echo "ERROR: Instance Refresh was not created"
+                            exit 1
+                        fi
+
+                        echo "Instance Refresh started:"
+                        echo "${REFRESH_ID}"
+
+                        echo "${REFRESH_ID}" > refresh_id.txt
+                    '''
+                }
+            }
+        }
+
+
+
+        stage('Wait For Deployment') {
+            steps {
+                withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                    sh '''
+                        set -e
+
+                        REFRESH_ID=$(cat refresh_id.txt)
+
+                        echo "======================================"
+                        echo "Waiting for Instance Refresh"
+                        echo "======================================"
+
+                        echo "Refresh ID: ${REFRESH_ID}"
+
+                        for i in $(seq 1 60); do
+
+                            STATUS=$(aws autoscaling describe-instance-refreshes \
+                                --auto-scaling-group-name "${ASG_NAME}" \
+                                --instance-refresh-ids "${REFRESH_ID}" \
+                                --region "${AWS_REGION}" \
+                                --query 'InstanceRefreshes[0].Status' \
+                                --output text)
+
+                            echo "Attempt ${i}/60"
+                            echo "Instance Refresh status: ${STATUS}"
+
+                            case "${STATUS}" in
+
+                                Successful)
+                                    echo "Deployment completed successfully."
+                                    exit 0
+                                    ;;
+
+                                Failed|Cancelled|RollbackFailed)
+                                    echo "Deployment failed with status: ${STATUS}"
+                                    exit 1
+                                    ;;
+
+                                Pending|InProgress)
+                                    echo "Deployment still in progress..."
+                                    sleep 20
+                                    ;;
+
+                                *)
+                                    echo "Unknown status: ${STATUS}"
+                                    sleep 20
+                                    ;;
+
+                            esac
+
+                        done
+
+                        echo "Deployment timed out."
+                        exit 1
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                script {
+
+                    timeout(time: 3, unit: 'MINUTES') {
+
+                        waitUntil {
+
+                            def status = sh(
+                                script: """
+                                    curl -s \
+                                         -o /tmp/health.json \
+                                         -w "%{http_code}" \
+                                         ${HEALTH_URL}
+                                """,
+                                returnStdout: true
+                            ).trim()
+
+                            def response = sh(
+                                script: """
+                                    cat /tmp/health.json
+                                """,
+                                returnStdout: true
+                            ).trim()
+
+                            echo "HTTP Status: ${status}"
+                            echo "Health Response: ${response}"
+
+                            if (status == '200' &&
+                                response.contains('"status":"UP"')) {
+
+                                echo "Application health check passed."
+
+                                return true
+                            }
+
+                            echo "Application is not healthy yet."
+                            echo "Waiting 10 seconds..."
+
+                            sleep 10
+
+                            return false
+                        }
+                    }
+                }
+            }
+        }
     }
 
     post {
+
         success {
-            echo "Billing Service CI/CD pipeline completed successfully."
-            echo "Image: ${IMAGE_NAME}"
+            echo "======================================"
+            echo "CI/CD PIPELINE SUCCESS"
+            echo "======================================"
+
+            echo "Image: ${ECR_REPOSITORY}:${IMAGE_TAG}"
         }
 
         failure {
-            echo "Billing Service CI/CD pipeline failed."
+            echo "======================================"
+            echo "CI/CD PIPELINE FAILED"
+            echo "======================================"
         }
 
         always {
             sh '''
-                docker logout "$ECR_REGISTRY" || true
+                docker logout ${ECR_REGISTRY} || true
             '''
         }
     }
