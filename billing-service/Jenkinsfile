@@ -124,7 +124,7 @@ pipeline {
                     echo "Creating new Launch Template version..."
                     echo "Image: $IMAGE_NAME"
 
-                    cat > /tmp/billing-user-data.sh <<EOF
+                    cat > billing-user-data.sh <<EOF
     #!/bin/bash
 
     set -e
@@ -154,27 +154,30 @@ pipeline {
         "$ECR_REPO:$IMAGE_TAG"
     EOF
 
-                    USER_DATA=$(base64 -w 0 /tmp/billing-user-data.sh)
+                    USER_DATA=$(base64 -w 0 billing-user-data.sh)
 
 
                     jq -n \
                          --arg userData "$USER_DATA" \
                          '{UserData: $userData}' \
-                         > /tmp/launch-template-data.json
+                         > launch-template-data.json
 
-                    cat /tmp/launch-template-data.json
+
+
+                    jq empty launch-template-data.json
+                    cat launch-template-data.json
 
                     VERSION=$(aws ec2 create-launch-template-version \
                                         --launch-template-id "$LAUNCH_TEMPLATE_ID" \
                                         --source-version '$Latest' \
-                                        --launch-template-data file:///tmp/launch-template-data.json \
+                                        --launch-template-data file://launch-template-data.json \
                                         --region "$AWS_REGION" \
                                         --query 'LaunchTemplateVersion.VersionNumber' \
                                         --output text)
 
                     echo "Created Launch Template version: $VERSION"
 
-                    echo "$VERSION" > /tmp/billing-lt-version'''
+                    echo "$VERSION" > billing-lt-version'''
                 }
             }
         }
@@ -192,7 +195,7 @@ pipeline {
                 sh '''
                     set -e
 
-                    VERSION=$(cat /tmp/billing-lt-version)
+                    VERSION=$(cat billing-lt-version)
 
                     echo "Updating ASG..."
                     echo "Launch Template version: $VERSION"
