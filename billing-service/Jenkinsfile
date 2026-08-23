@@ -10,7 +10,7 @@ pipeline {
         IMAGE_TAG = "${BUILD_NUMBER}"
         ASG_NAME = 'billing-service-asg'
         LAUNCH_TEMPLATE_ID = 'lt-081eb86844a4e5049'
-
+        IAM_INSTANCE_PROFILE= 'billing-service-ec2-role'
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
         IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
@@ -151,6 +151,7 @@ pipeline {
                             --arg userData "${USER_DATA}" \
                             --arg profileName "${IAM_INSTANCE_PROFILE}" \
                             '{
+                                InstanceType: "t3.micro",
                                 UserData: $userData,
                                 IamInstanceProfile: {
                                     Name: $profileName
@@ -169,7 +170,6 @@ pipeline {
                             --source-version '$Default' \
                             --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
                             --launch-template-data file://launch-template-data.json \
-                            --launch-template-data '{"InstanceType":"t3.micro"}' \
                             --region "${AWS_REGION}" \
                             --query 'LaunchTemplateVersion.VersionNumber' \
                             --output text)
