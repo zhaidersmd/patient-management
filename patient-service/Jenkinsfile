@@ -30,7 +30,7 @@ pipeline {
                         'SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5433/postgres',
                         'SPRING_DATASOURCE_USERNAME=postgres',
                         'SPRING_DATASOURCE_PASSWORD=postgres',
-                        'BILLING_SERVICE_ADDRESS=10.0.12.119',
+                        'BILLING_SERVICE_ADDRESS=billing-internal-nlb-f1c3e68810cdbcb9.elb.ap-south-1.amazonaws.com',
                         'BILLING_SERVICE_GRPC_PORT=9001'
                     ]) {
                     dir('patient-service') {

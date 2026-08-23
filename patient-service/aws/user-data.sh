@@ -11,7 +11,7 @@ SECRET_ARN="arn:aws:secretsmanager:ap-south-1:774118824657:secret:patient-servic
 RDS_HOST="patientdb2.cxeseem0ax4c.ap-south-1.rds.amazonaws.com"
 RDS_PORT="5432"
 RDS_DB="postgres"
-BILLING_SERVICE_ADDRESS="10.0.12.119"
+BILLING_SERVICE_ADDRESS="billing-internal-nlb-f1c3e68810cdbcb9.elb.ap-south-1.amazonaws.com"
 BILLING_SERVICE_GRPC_PORT="9001"
 
 
