@@ -115,72 +115,96 @@ pipeline {
 
             withCredentials([
                 [$class: 'AmazonWebServicesCredentialsBinding',
-                 credentialsId: "${AWS_CREDENTIALS}"]
+                    credentialsId: "${AWS_CREDENTIALS}"]
             ]) {
 
                 sh '''
                     set -e
 
-                    echo "Creating new Launch Template version..."
-                    echo "Image: $IMAGE_NAME"
+                    echo "======================================"
+                    echo "Creating Launch Template version"
+                    echo "======================================"
 
-                    cat > billing-user-data.sh <<EOF
-    #!/bin/bash
+                    echo "Launch Template: ${LAUNCH_TEMPLATE_ID}"
+                    echo "Image tag:       ${IMAGE_TAG}"
+                    echo "Build number:    ${BUILD_NUMBER}"
 
-    set -e
+                    if [ -z "${LAUNCH_TEMPLATE_ID}" ]; then
+                        echo "ERROR: LAUNCH_TEMPLATE_ID is empty"
+                        exit 1
+                    fi
 
-    REGION="ap-south-1"
-    ECR_REPO="774118824657.dkr.ecr.ap-south-1.amazonaws.com/billing-service"
-    IMAGE_TAG="$IMAGE_TAG"
+                    if [ -z "${IMAGE_TAG}" ]; then
+                        echo "ERROR: IMAGE_TAG is empty"
+                        exit 1
+                    fi
 
-    dnf install -y docker
+                    echo "Generating User Data..."
 
-    systemctl enable --now docker
+                    sed "s/__IMAGE_TAG__/${IMAGE_TAG}/g" \
+                        billing-service/aws/user-data.sh \
+                        > generated-user-data.sh
 
-    aws ecr get-login-password \
-        --region "$REGION" | \
-    docker login \
-        --username AWS \
-        --password-stdin "$ECR_REPO"
+                    echo "Generated User Data:"
+                    cat generated-user-data.sh
 
-    docker pull "$ECR_REPO:$IMAGE_TAG"
+                    echo "Encoding User Data..."
 
-    docker rm -f billing-service 2>/dev/null || true
+                    USER_DATA=$(base64 -w 0 generated-user-data.sh)
 
-    docker run -d \
-        --name billing-service \
-        --restart unless-stopped \
-        -p 9001:9001 \
-        "$ECR_REPO:$IMAGE_TAG"
-    EOF
+                    if [ -z "${USER_DATA}" ]; then
+                        echo "ERROR: User Data encoding failed"
+                        exit 1
+                    fi
 
-                    USER_DATA=$(base64 -w 0 billing-user-data.sh)
+                    echo "Creating Launch Template JSON..."
+
+                    jq -n \
+                        --arg userData "${USER_DATA}" \
+                        '{
+                            UserData: $userData
+                        }' > launch-template-data.json
+
+                    echo "Validating JSON..."
 
                     jq empty launch-template-data.json
-                    jq -n \
-                         --arg userData "$USER_DATA" \
-                         '{UserData: $userData}' \
-                         > launch-template-data.json
 
+                    echo "JSON validation successful."
 
+                    echo "Creating new Launch Template version..."
 
+                    NEW_VERSION=$(aws ec2 create-launch-template-version \
+                        --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
+                        --source-version '$Latest' \
+                        --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
+                        --launch-template-data file://launch-template-data.json \
+                        --region "${AWS_REGION}" \
+                        --query 'LaunchTemplateVersion.VersionNumber' \
+                        --output text)
 
-                    cat launch-template-data.json
+                    if [ -z "${NEW_VERSION}" ] || [ "${NEW_VERSION}" = "None" ]; then
+                        echo "ERROR: Failed to create Launch Template version"
+                        exit 1
+                    fi
 
-                    VERSION=$(aws ec2 create-launch-template-version \
-                                        --launch-template-id "$LAUNCH_TEMPLATE_ID" \
-                                        --source-version '$Latest' \
-                                        --launch-template-data file://launch-template-data.json \
-                                        --region "$AWS_REGION" \
-                                        --query 'LaunchTemplateVersion.VersionNumber' \
-                                        --output text)
+                    echo "New Launch Template version: ${NEW_VERSION}"
 
-                    echo "Created Launch Template version: $VERSION"
+                    echo "Verifying Launch Template version..."
 
-                    echo "$VERSION" > billing-lt-version'''
-                }
+                    aws ec2 describe-launch-template-versions \
+                        --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
+                        --versions "${NEW_VERSION}" \
+                        --region "${AWS_REGION}" \
+                        --query 'LaunchTemplateVersions[0].LaunchTemplateData' \
+                        --output json
+
+                    echo "${NEW_VERSION}" > "${WORKSPACE}/new_lt_version.txt"
+
+                    echo "Launch Template version saved."
+                '''
             }
         }
+    }
 
 
     stage('Update ASG Launch Template') {
@@ -195,7 +219,7 @@ pipeline {
                 sh '''
                     set -e
 
-                    VERSION=$(cat billing-lt-version)
+                    VERSION="${WORKSPACE}/new_lt_version.txt"
 
                     echo "Updating ASG..."
                     echo "Launch Template version: $VERSION"
