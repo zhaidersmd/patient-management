@@ -156,13 +156,21 @@ pipeline {
 
                     USER_DATA=$(base64 -w 0 /tmp/billing-user-data.sh)
 
+
+                    jq -n \
+                         --arg userData "$USER_DATA" \
+                         '{UserData: $userData}' \
+                         > /tmp/launch-template-data.json
+
+                    cat /tmp/launch-template-data.json
+
                     VERSION=$(aws ec2 create-launch-template-version \
-                        --launch-template-id "$LAUNCH_TEMPLATE_ID" \
-                        --source-version '$Latest' \
-                        --launch-template-data "{\"UserData\":\"$USER_DATA\"}" \
-                        --region "$AWS_REGION" \
-                        --query 'LaunchTemplateVersion.VersionNumber' \
-                        --output text)
+                                        --launch-template-id "$LAUNCH_TEMPLATE_ID" \
+                                        --source-version '$Latest' \
+                                        --launch-template-data file:///tmp/launch-template-data.json \
+                                        --region "$AWS_REGION" \
+                                        --query 'LaunchTemplateVersion.VersionNumber' \
+                                        --output text)
 
                     echo "Created Launch Template version: $VERSION"
 
