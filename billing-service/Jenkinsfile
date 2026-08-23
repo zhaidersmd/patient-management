@@ -159,28 +159,33 @@ pipeline {
 
                     echo "Creating Launch Template JSON..."
 
-                    jq -n \
-                        --arg userData "${USER_DATA}" \
-                        '{
-                            UserData: $userData
-                        }' > launch-template-data.json
+                    echo "Reading current Launch Template configuration..."
+
+                    CURRENT_LT_DATA=$(aws ec2 describe-launch-template-versions \
+                        --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
+                        --versions '$Latest' \
+                        --region "${AWS_REGION}" \
+                        --query 'LaunchTemplateVersions[0].LaunchTemplateData' \
+                        --output json)
+
+                    echo "Current Launch Template configuration:"
+                    echo "$CURRENT_LT_DATA" | jq 'del(.UserData)'
+
+                    echo "Creating new Launch Template configuration..."
+
+                    echo "$CURRENT_LT_DATA" | \
+                    jq --arg userData "$USER_DATA" \
+                       '.UserData = $userData' \
+                       > launch-template-data.json
 
                     echo "Validating JSON..."
 
                     jq empty launch-template-data.json
 
-                    echo "JSON validation successful."
+                    echo "New Launch Template configuration:"
+                    jq 'del(.UserData)' launch-template-data.json
 
                     echo "Creating new Launch Template version..."
-
-                    echo "Checking latest Launch Template..."
-
-                    aws ec2 describe-launch-template-versions \
-                        --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
-                        --versions '$Latest' \
-                        --region "${AWS_REGION}" \
-                        --query 'LaunchTemplateVersions[0].LaunchTemplateData' \
-                        --output json
 
                     NEW_VERSION=$(aws ec2 create-launch-template-version \
                         --launch-template-id "${LAUNCH_TEMPLATE_ID}" \
@@ -270,7 +275,7 @@ pipeline {
                     echo "Instance Refresh started:"
                     echo "$REFRESH_ID"
 
-                    echo "$REFRESH_ID" > /tmp/billing-refresh-id
+                    echo "$REFRESH_ID" > "${WORKSPACE}/billing-refresh-id.txt"
                 '''
             }
         }
@@ -288,7 +293,7 @@ pipeline {
                 sh '''
                     set -e
 
-                    REFRESH_ID=$(cat /tmp/billing-refresh-id)
+                    REFRESH_ID=$(cat "${WORKSPACE}/billing-refresh-id.txt")
 
                     echo "Waiting for Instance Refresh..."
 
@@ -368,12 +373,12 @@ pipeline {
 
     post {
         success {
-            echo "Billing Service CI pipeline completed successfully."
+            echo "Billing Service CI/CD pipeline completed successfully."
             echo "Image: ${IMAGE_NAME}"
         }
 
         failure {
-            echo "Billing Service CI pipeline failed."
+            echo "Billing Service CI/CD pipeline failed."
         }
 
         always {
