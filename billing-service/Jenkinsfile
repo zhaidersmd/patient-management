@@ -169,6 +169,7 @@ pipeline {
                             --source-version '$Default' \
                             --version-description "Jenkins build ${BUILD_NUMBER} - image ${IMAGE_TAG}" \
                             --launch-template-data file://launch-template-data.json \
+                            --launch-template-data '{"InstanceType":"t3.micro"}' \
                             --region "${AWS_REGION}" \
                             --query 'LaunchTemplateVersion.VersionNumber' \
                             --output text)
