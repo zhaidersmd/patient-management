@@ -28,12 +28,12 @@ pipeline {
         stage('Build & Test') {
             steps {
                 dir('billing-service') {
-                    dir('billing-service') {
+
                         sh '''
                             set -e
                             mvn -B clean test
                         '''
-                    }
+                   
                 }
             }
         }
