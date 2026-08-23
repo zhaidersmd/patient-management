@@ -219,7 +219,7 @@ pipeline {
                 sh '''
                     set -e
 
-                    VERSION="${WORKSPACE}/new_lt_version.txt"
+                    VERSION=$(cat "${WORKSPACE}/new_lt_version.txt")
 
                     echo "Updating ASG..."
                     echo "Launch Template version: $VERSION"
