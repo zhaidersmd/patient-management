@@ -25,7 +25,7 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-            dir('patient-service') {
+            dir('billing-service') {
                 sh '''
                     set -e
                     mvn -B clean test
