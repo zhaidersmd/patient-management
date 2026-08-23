@@ -5,7 +5,7 @@ pipeline {
     environment {
         AWS_REGION = 'ap-south-1'
         AWS_ACCOUNT_ID = '774118824657'
-
+        AWS_CREDENTIALS = 'aws-patient-service'
         ECR_REPOSITORY = 'billing-service'
 
         IMAGE_TAG = "${BUILD_NUMBER}"
