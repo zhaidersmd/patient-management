@@ -83,6 +83,23 @@ pipeline {
         }
     }
 
+    stage('Verify ECR Image') {
+        steps {
+            sh '''
+                set -e
+
+                echo "Verifying image exists in ECR..."
+
+                aws ecr describe-images \
+                    --repository-name "$ECR_REPOSITORY" \
+                    --image-ids imageTag="$IMAGE_TAG" \
+                    --region "$AWS_REGION"
+
+                echo "ECR image verification successful."
+            '''
+        }
+    }
+
     post {
         success {
             echo "Billing Service CI pipeline completed successfully."
