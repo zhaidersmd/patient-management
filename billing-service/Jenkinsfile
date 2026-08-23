@@ -1,0 +1,99 @@
+pipeline {
+
+    agent any
+
+    environment {
+        AWS_REGION = 'ap-south-1'
+        AWS_ACCOUNT_ID = '774118824657'
+
+        ECR_REPOSITORY = 'billing-service'
+
+        IMAGE_TAG = "${BUILD_NUMBER}"
+
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+        IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                sh '''
+                    set -e
+                    mvn -B clean test
+                '''
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "Building Docker image:"
+                    echo "$IMAGE_NAME"
+
+                    docker build \
+                        --platform linux/amd64 \
+                        -t "$IMAGE_NAME" \
+                        .
+                '''
+            }
+        }
+
+        stage('ECR Login') {
+            steps {
+             withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: "${AWS_CREDENTIALS}"]
+                    ]) {
+                sh '''
+                    set -e
+
+                    aws ecr get-login-password \
+                        --region "$AWS_REGION" | \
+                    docker login \
+                        --username AWS \
+                        --password-stdin "$ECR_REGISTRY"
+                '''
+            }}
+        }
+
+        stage('Push to ECR') {
+            steps {
+                sh '''
+                    set -e
+
+                    docker push "$IMAGE_NAME"
+
+                    echo "Successfully pushed:"
+                    echo "$IMAGE_NAME"
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Billing Service CI pipeline completed successfully."
+            echo "Image: ${IMAGE_NAME}"
+        }
+
+        failure {
+            echo "Billing Service CI pipeline failed."
+        }
+
+        always {
+            sh '''
+                docker logout "$ECR_REGISTRY" || true
+            '''
+        }
+    }
+}
