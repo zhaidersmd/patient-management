@@ -34,8 +34,9 @@ pipeline {
         }
 
         stage('Docker Build') {
-            dir('billing-service') {
+
             steps {
+            dir('billing-service') {
                 sh '''
                     set -e
 
