@@ -79,6 +79,10 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
+            withCredentials([
+                                    [$class: 'AmazonWebServicesCredentialsBinding',
+                                        credentialsId: "${AWS_CREDENTIALS}"]
+                                ]) {
                 sh '''
                     set -e
 
@@ -93,7 +97,7 @@ pipeline {
 
                     docker push ${ECR_REPOSITORY}:${IMAGE_TAG}
                 '''
-            }
+            }}
         }
 
         stage('Create Launch Template Version') {
